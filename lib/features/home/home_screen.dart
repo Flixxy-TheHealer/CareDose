@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+import '../../core/responsive/responsive_layout.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_fonts.dart';
 import '../history/history_screen.dart';
@@ -61,40 +62,134 @@ class CareDoseDashboardTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final height = constraints.maxHeight;
-          final config = _LayoutConfig.fromHeight(height);
+    final horizontalPadding = Responsive.horizontalPadding(context);
 
-          return Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-            child: Column(
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        textScaler: Responsive.clampedTextScaler(context),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final availableHeight = constraints.maxHeight;
+            final distribution = Responsive.calculateVerticalDistribution(
+              context,
+              availableHeight,
+            );
+
+            // Full clearance offset so floating bottom nav bar never obscures bottom-most card when scrolled
+            final double bottomNavClearance = MediaQuery.of(context).padding.bottom + 90.0;
+            final isPhoneLandscape = Responsive.isPhoneLandscape(context);
+
+            if (isPhoneLandscape) {
+              // Phone Landscape: Full-width Header with aligned 2-Column Baseline & Left-Column Scroll Fallback
+              return Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding,
+                  vertical: 12.0,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Full-Width Header spanning across both columns
+                    const _HomeHeader(),
+                    SizedBox(height: distribution.verticalGap),
+
+                    // 2-Column Row starting at identical top baseline
+                    Expanded(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Left Column: Next Dose Hero Card with scroll fallback for ultra-short devices (e.g. SE)
+                          Expanded(
+                            child: SingleChildScrollView(
+                              physics: const ClampingScrollPhysics(),
+                              child: _NextDoseCard(cardPadding: distribution.cardPadding),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+
+                          // Right Column: Progress Card + At a Glance + Health Tip Card (Independently scrollable)
+                          Expanded(
+                            child: Stack(
+                              children: [
+                                SingleChildScrollView(
+                                  physics: const ClampingScrollPhysics(),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _TodayProgressCard(cardPadding: distribution.cardPadding),
+                                      SizedBox(height: distribution.verticalGap),
+                                      _AtAGlanceSection(
+                                        distribution: distribution,
+                                        onMedicinesTap: () {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('12 Active medicines are currently tracked.'),
+                                              behavior: SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        },
+                                        onLowStockTap: onInventoryTap,
+                                        onUpcomingTap: onHistoryTap,
+                                      ),
+                                      SizedBox(height: distribution.verticalGap),
+                                      _HealthTipCard(distribution: distribution),
+                                      SizedBox(height: bottomNavClearance),
+                                    ],
+                                  ),
+                                ),
+                                // Soft gradient indicator at bottom edge when content extends below
+                                Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  height: 24,
+                                  child: IgnorePointer(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            AppColors.background.withValues(alpha: 0.0),
+                                            AppColors.background.withValues(alpha: 0.85),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // Standard Phone Portrait Single-Column Stack
+            Widget dashboardContent = Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Section 1: Header
-                _HomeHeader(config: config),
-                SizedBox(height: config.verticalGap),
-
-                // Section 2: Next Dose Card
-                _NextDoseCard(config: config),
-                SizedBox(height: config.verticalGap),
-
-                // Section 3: Progress Card
-                _TodayProgressCard(config: config),
-                SizedBox(height: config.verticalGap),
-
-                // Section 4: At a Glance Section
+                const _HomeHeader(),
+                SizedBox(height: distribution.verticalGap),
+                _NextDoseCard(cardPadding: distribution.cardPadding),
+                SizedBox(height: distribution.verticalGap),
+                _TodayProgressCard(cardPadding: distribution.cardPadding),
+                SizedBox(height: distribution.verticalGap),
                 _AtAGlanceSection(
-                  config: config,
+                  distribution: distribution,
                   onMedicinesTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content:
-                            Text('12 Active medicines are currently tracked.'),
+                        content: Text('12 Active medicines are currently tracked.'),
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
@@ -102,88 +197,42 @@ class CareDoseDashboardTab extends StatelessWidget {
                   onLowStockTap: onInventoryTap,
                   onUpcomingTap: onHistoryTap,
                 ),
-                SizedBox(height: config.verticalGap),
-
-                // Section 5: Health Tip Card
-                _HealthTipCard(config: config),
+                SizedBox(height: distribution.verticalGap),
+                _HealthTipCard(distribution: distribution),
+                SizedBox(height: bottomNavClearance),
               ],
-            ),
-          );
-        },
+            );
+
+            Widget scrollableBody = SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: 12.0,
+              ),
+              child: dashboardContent,
+            );
+
+            // Tablet cap: Center 500dp container horizontally across wide tablet viewports
+            if (Responsive.isTabletWidth(context) && !isPhoneLandscape) {
+              return Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+                  child: scrollableBody,
+                ),
+              );
+            }
+
+            return scrollableBody;
+          },
+        ),
       ),
     );
   }
 }
 
-class _LayoutConfig {
-  final double verticalGap;
-  final double avatarSize;
-  final double heroPadding;
-  final double heroContentHeight;
-  final double heroButtonHeight;
-  final double progressPadding;
-  final double progressRingSize;
-  final double glanceCardHeight;
-  final double glancePadding;
-  final double glanceValueSize;
-  final double glanceIconSize;
-  final double glanceLabelSize;
-  final double glanceSublabelSize;
-  final double healthTipHeight;
-  final double healthTipMascotSize;
-  final double fontSizeName;
-  final double fontSizeMedicine;
-
-  _LayoutConfig({
-    required this.verticalGap,
-    required this.avatarSize,
-    required this.heroPadding,
-    required this.heroContentHeight,
-    required this.heroButtonHeight,
-    required this.progressPadding,
-    required this.progressRingSize,
-    required this.glanceCardHeight,
-    required this.glancePadding,
-    required this.glanceValueSize,
-    required this.glanceIconSize,
-    required this.glanceLabelSize,
-    required this.glanceSublabelSize,
-    required this.healthTipHeight,
-    required this.healthTipMascotSize,
-    required this.fontSizeName,
-    required this.fontSizeMedicine,
-  });
-
-  factory _LayoutConfig.fromHeight(double height) {
-    // Clamp height to normal range [500, 850] and get scaling factor
-    final double factor = ((height - 500) / 350).clamp(0.0, 1.0);
-
-    return _LayoutConfig(
-      verticalGap: 7.0 + (9.0 * factor), // 8 to 20
-      avatarSize: 38.0 + (14.0 * factor), // 38 to 52
-      heroPadding: 12.0 + (8.0 * factor), // 12 to 20
-      heroContentHeight: 46.0 + (18.0 * factor), // 46 to 64
-      heroButtonHeight: 38.0 + (10.0 * factor), // 38 to 48
-      progressPadding: 8.0 + (6.0 * factor), // 8 to 16
-      progressRingSize: 82.0 + (28.0 * factor), // 82 to 100
-      glanceCardHeight: 105.0 + (18.0 * factor), // 116 to 146
-      glancePadding: 8.0, // Fixed padding for consistency
-      glanceValueSize: 22.0 + (5.0 * factor), // 28 to 38
-      glanceIconSize: 27.0 + (4.0 * factor), // 30 to 38
-      glanceLabelSize: 11.5 + (1.5 * factor), // 12 to 14
-      glanceSublabelSize: 9.5 + (1.5 * factor), // 10 to 12
-      healthTipHeight: 80.0 + (40.0 * factor), // 80 to 120
-      healthTipMascotSize: 90.0 + (40.0 * factor), // 90 to 130
-      fontSizeName: 20.0 + (10.0 * factor), // 20 to 30
-      fontSizeMedicine: 18.0 + (6.0 * factor), // 18 to 24
-    );
-  }
-}
-
 class _HomeHeader extends StatefulWidget {
-  const _HomeHeader({required this.config});
-
-  final _LayoutConfig config;
+  const _HomeHeader();
 
   @override
   State<_HomeHeader> createState() => _HomeHeaderState();
@@ -194,6 +243,20 @@ class _HomeHeaderState extends State<_HomeHeader> {
 
   @override
   Widget build(BuildContext context) {
+    final avatarSize = Responsive.valueByWidth<double>(
+      context,
+      compact: 40.0,
+      normal: 46.0,
+      large: 50.0,
+    );
+
+    final nameFontSize = Responsive.valueByWidth<double>(
+      context,
+      compact: 22.0,
+      normal: 24.0,
+      large: 26.0,
+    );
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -206,7 +269,7 @@ class _HomeHeaderState extends State<_HomeHeader> {
                 'Good Morning,',
                 style: TextStyle(
                   color: AppColors.textSecondary,
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w500,
                   fontFamily: AppFonts.inter,
                 ),
@@ -216,13 +279,13 @@ class _HomeHeaderState extends State<_HomeHeader> {
                 'Mr. Patel 👋',
                 style: TextStyle(
                   color: AppColors.textPrimary,
-                  fontSize: widget.config.fontSizeName,
+                  fontSize: nameFontSize,
                   fontWeight: FontWeight.w800,
                   fontFamily: AppFonts.inter,
-                  height: 1.1,
+                  height: 1.15,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               const Text(
                 'Take care, stay healthy.',
                 style: TextStyle(
@@ -235,6 +298,7 @@ class _HomeHeaderState extends State<_HomeHeader> {
             ],
           ),
         ),
+        const SizedBox(width: 12),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -250,8 +314,8 @@ class _HomeHeaderState extends State<_HomeHeader> {
                 );
               },
               child: Container(
-                width: widget.config.avatarSize,
-                height: widget.config.avatarSize,
+                width: avatarSize,
+                height: avatarSize,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
@@ -263,7 +327,9 @@ class _HomeHeaderState extends State<_HomeHeader> {
                     ),
                   ],
                   border: Border.all(
-                      color: Colors.black.withValues(alpha: 0.02), width: 1.2),
+                    color: Colors.black.withValues(alpha: 0.02),
+                    width: 1.2,
+                  ),
                 ),
                 child: Stack(
                   alignment: Alignment.center,
@@ -271,12 +337,12 @@ class _HomeHeaderState extends State<_HomeHeader> {
                     Icon(
                       Icons.notifications_none_rounded,
                       color: AppColors.textPrimary,
-                      size: widget.config.avatarSize * 0.55,
+                      size: avatarSize * 0.55,
                     ),
                     if (_hasNotification)
                       Positioned(
-                        right: widget.config.avatarSize * 0.22,
-                        top: widget.config.avatarSize * 0.22,
+                        right: avatarSize * 0.22,
+                        top: avatarSize * 0.22,
                         child: Container(
                           width: 7,
                           height: 7,
@@ -291,10 +357,10 @@ class _HomeHeaderState extends State<_HomeHeader> {
               ),
             ),
             const SizedBox(width: 10),
-            // Profile avatar with soft green background and dynamic layout
+            // Profile avatar with soft green background
             Container(
-              width: widget.config.avatarSize,
-              height: widget.config.avatarSize,
+              width: avatarSize,
+              height: avatarSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.primary.withValues(alpha: 0.12),
@@ -316,8 +382,8 @@ class _HomeHeaderState extends State<_HomeHeader> {
                   Center(
                     child: ClipOval(
                       child: SizedBox(
-                        width: widget.config.avatarSize - 3,
-                        height: widget.config.avatarSize - 3,
+                        width: avatarSize - 3,
+                        height: avatarSize - 3,
                         child: Transform.scale(
                           scale: 1.65,
                           origin: const Offset(0, 1.5),
@@ -333,8 +399,8 @@ class _HomeHeaderState extends State<_HomeHeader> {
                     right: -1,
                     bottom: -1,
                     child: Container(
-                      width: widget.config.avatarSize * 0.24,
-                      height: widget.config.avatarSize * 0.24,
+                      width: avatarSize * 0.24,
+                      height: avatarSize * 0.24,
                       decoration: BoxDecoration(
                         color: AppColors.warning,
                         shape: BoxShape.circle,
@@ -353,9 +419,9 @@ class _HomeHeaderState extends State<_HomeHeader> {
 }
 
 class _NextDoseCard extends StatefulWidget {
-  const _NextDoseCard({required this.config});
+  const _NextDoseCard({required this.cardPadding});
 
-  final _LayoutConfig config;
+  final double cardPadding;
 
   @override
   State<_NextDoseCard> createState() => _NextDoseCardState();
@@ -364,310 +430,310 @@ class _NextDoseCard extends StatefulWidget {
 class _NextDoseCardState extends State<_NextDoseCard> {
   bool _isTaken = false;
 
+  static const double _cardRadius = 24.0;
+  static const double _buttonRadius = 12.0;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: const Color(0xFF2E7D32), // CareDose primary deep green
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(_cardRadius),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2E7D32).withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: AppColors.warning.withValues(alpha: 0.15),
-            blurRadius: 20,
-            offset: const Offset(4, -4),
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Stack(
-          children: [
-            // Controlled yellow glow from top corner
-            Positioned(
-              top: -50,
-              right: -50,
-              child: Container(
-                width: 160,
-                height: 160,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      AppColors.warning.withValues(alpha: 0.25),
-                      AppColors.secondary.withValues(alpha: 0.12),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ),
+      child: Stack(
+        children: [
+          // Controlled yellow glow from top corner
+          Positioned(
+            top: -50,
+            right: -50,
+            child: Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    AppColors.warning.withValues(alpha: 0.25),
+                    AppColors.secondary.withValues(alpha: 0.12),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
               ),
             ),
+          ),
 
-            Padding(
-              padding: EdgeInsets.all(widget.config.heroPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.bolt_rounded,
-                              color: AppColors.warning,
-                              size: 13,
-                            ),
-                            SizedBox(width: 2),
-                            Text(
-                              'NEXT DOSE',
-                              style: TextStyle(
-                                color: Color(0xFFFFF9C4),
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                fontFamily: AppFonts.inter,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
+          Padding(
+            padding: EdgeInsets.all(widget.cardPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            width: 1,
-                          ),
-                        ),
-                        child: const Text(
-                          '8:00 AM',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: AppFonts.inter,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: widget.config.verticalGap * 0.8),
-                  SizedBox(
-                    height: widget.config.heroContentHeight,
-                    child: Row(
-                      children: [
-                        Container(
-                          width: widget.config.heroContentHeight,
-                          height: widget.config.heroContentHeight,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppColors.warning.withValues(alpha: 0.3),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Icon(
-                            Icons.medication_rounded,
-                            color: AppColors.warning,
-                            size: widget.config.heroContentHeight * 0.55,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  'Aspirin 75mg',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: widget.config.fontSizeMedicine,
-                                    fontWeight: FontWeight.w800,
-                                    fontFamily: AppFonts.inter,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              const Text(
-                                '1 Tablet • After Breakfast',
-                                style: TextStyle(
-                                  color: Color(0xFFE5EDE8),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
-                                  fontFamily: AppFonts.inter,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: widget.config.verticalGap * 0.8),
-                  AnimatedCrossFade(
-                    duration: const Duration(milliseconds: 250),
-                    crossFadeState: _isTaken
-                        ? CrossFadeState.showSecond
-                        : CrossFadeState.showFirst,
-                    firstChild: SizedBox(
-                      height: widget.config.heroButtonHeight,
-                      child: Row(
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Expanded(
-                            flex: 3,
-                            child: TappableScale(
-                              onTap: () {
-                                setState(() => _isTaken = true);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                        'Aspirin 75mg logged successfully!'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: AppColors.warning,
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.warning
-                                          .withValues(alpha: 0.3),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 3),
-                                    )
-                                  ],
-                                ),
-                                child: const Center(
-                                  child: Text(
-                                    'Take Now',
-                                    style: TextStyle(
-                                      color: Color(0xFF2E7D32),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      fontFamily: AppFonts.inter,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                          Icon(
+                            Icons.bolt_rounded,
+                            color: AppColors.warning,
+                            size: 13,
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            flex: 2,
-                            child: TappableScale(
-                              onTap: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content:
-                                        Text('Dose snoozed for 15 minutes.'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              },
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.25),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: const Center(
-                                  child: Text(
-                                    'Snooze',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      fontFamily: AppFonts.inter,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                          SizedBox(width: 2),
+                          Text(
+                            'NEXT DOSE',
+                            style: TextStyle(
+                              color: Color(0xFFFFF9C4),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              fontFamily: AppFonts.inter,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    secondChild: Container(
-                      height: widget.config.heroButtonHeight,
-                      width: double.infinity,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.secondary.withValues(alpha: 0.25),
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          width: 1,
+                        ),
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: const Text(
+                        '8:00 AM',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          fontFamily: AppFonts.inter,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Medicine Information Row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.medication_rounded,
+                        color: AppColors.warning,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.check_circle_rounded,
-                            color: AppColors.warning,
-                            size: 20,
-                          ),
-                          SizedBox(width: 6),
                           Text(
-                            'Logged as Taken today',
+                            'Aspirin 75mg',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              fontFamily: AppFonts.inter,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            '1 Tablet • After Breakfast',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Color(0xFFE5EDE8),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
                               fontFamily: AppFonts.inter,
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Action Buttons (Content-driven minimum height)
+                AnimatedCrossFade(
+                  duration: const Duration(milliseconds: 250),
+                  crossFadeState: _isTaken
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  firstChild: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: TappableScale(
+                          onTap: () {
+                            setState(() => _isTaken = true);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Aspirin 75mg logged successfully!'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 42),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning,
+                              borderRadius: BorderRadius.circular(_buttonRadius),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'Take Now',
+                                style: TextStyle(
+                                  color: Color(0xFF2E7D32),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  fontFamily: AppFonts.inter,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: TappableScale(
+                          onTap: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Dose snoozed for 15 minutes.'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                          child: Container(
+                            constraints: const BoxConstraints(minHeight: 42),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(_buttonRadius),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.25),
+                                width: 1,
+                              ),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'Snooze',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: AppFonts.inter,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                  secondChild: Container(
+                    constraints: const BoxConstraints(minHeight: 42),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(_buttonRadius),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_circle_rounded,
+                          color: AppColors.warning,
+                          size: 20,
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Logged as Taken today',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: AppFonts.inter,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _TodayProgressCard extends StatelessWidget {
-  const _TodayProgressCard({required this.config});
+  const _TodayProgressCard({required this.cardPadding});
 
-  final _LayoutConfig config;
+  final double cardPadding;
 
   @override
   Widget build(BuildContext context) {
+    final ringSize = Responsive.valueByWidth<double>(
+      context,
+      compact: 76.0,
+      normal: 86.0,
+      large: 96.0,
+    );
+
     return Container(
-      padding: EdgeInsets.all(config.progressPadding),
+      padding: EdgeInsets.all(cardPadding),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border:
-            Border.all(color: Colors.black.withValues(alpha: 0.02), width: 1.2),
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.02),
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -679,8 +745,8 @@ class _TodayProgressCard extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: config.progressRingSize,
-            height: config.progressRingSize,
+            width: ringSize,
+            height: ringSize,
             child: TweenAnimationBuilder<double>(
               tween: Tween<double>(begin: 0.0, end: 0.85),
               duration: const Duration(milliseconds: 1400),
@@ -690,7 +756,7 @@ class _TodayProgressCard extends StatelessWidget {
                   painter: _CircularProgressPainter(
                     progress: value,
                     trackColor: const Color(0xFFF1F5F2),
-                    progressColors: [
+                    progressColors: const [
                       AppColors.primary,
                       AppColors.secondary,
                     ],
@@ -704,23 +770,22 @@ class _TodayProgressCard extends StatelessWidget {
                           '${(value * 100).toInt()}%',
                           style: TextStyle(
                             color: AppColors.textPrimary,
-                            fontSize: config.progressRingSize * 0.29,
+                            fontSize: ringSize * 0.28,
                             fontWeight: FontWeight.w800,
                             fontFamily: AppFonts.inter,
-                            height: 0.88,
-                            letterSpacing: -1.0,
+                            height: 0.9,
+                            letterSpacing: -0.5,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           'Today',
                           style: TextStyle(
                             color: AppColors.textSecondary,
-                            fontSize: config.progressRingSize * 0.105,
+                            fontSize: ringSize * 0.11,
                             fontWeight: FontWeight.w500,
                             fontFamily: AppFonts.inter,
                             height: 1.0,
-                            letterSpacing: 0.1,
                           ),
                         ),
                       ],
@@ -730,56 +795,50 @@ class _TodayProgressCard extends StatelessWidget {
               },
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 14),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.max,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // PRIMARY — today's adherence summary
                 Text(
                   '4 of 5 doses taken',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.textPrimary,
-                    fontSize: 17,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                     fontFamily: AppFonts.inter,
                     height: 1.1,
                     letterSpacing: -0.3,
                   ),
                 ),
-
-                const SizedBox(height: 10),
-
-                // SECONDARY — positive feedback
+                SizedBox(height: 6),
                 Text(
                   'Great! You\'re doing well.',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.success,
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
                     fontFamily: AppFonts.inter,
                     height: 1.1,
                   ),
                 ),
-
-                const SizedBox(height: 8),
-
-                // TERTIARY — supporting context
+                SizedBox(height: 4),
                 Text(
                   'Almost done with today\'s schedule.',
                   maxLines: 2,
-                  style: const TextStyle(
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
                     fontFamily: AppFonts.inter,
-                    height: 1.35,
+                    height: 1.3,
                   ),
                 ),
               ],
@@ -860,13 +919,13 @@ class _CircularProgressPainter extends CustomPainter {
 
 class _AtAGlanceSection extends StatelessWidget {
   const _AtAGlanceSection({
-    required this.config,
+    required this.distribution,
     required this.onMedicinesTap,
     required this.onLowStockTap,
     required this.onUpcomingTap,
   });
 
-  final _LayoutConfig config;
+  final VerticalDistribution distribution;
   final VoidCallback onMedicinesTap;
   final VoidCallback onLowStockTap;
   final VoidCallback onUpcomingTap;
@@ -889,48 +948,54 @@ class _AtAGlanceSection extends StatelessWidget {
             ),
           ),
         ),
-        Row(
-          children: [
-            Expanded(
-              child: _GlanceCard(
-                config: config,
-                icon: Icons.medication_rounded,
-                iconColor: AppColors.primary,
-                iconBgColor: AppColors.primary.withValues(alpha: 0.1),
-                value: '12',
-                label: 'Medicines',
-                sublabel: 'In Stock',
-                onTap: onMedicinesTap,
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _GlanceCard(
+                  minHeight: distribution.glanceMinHeight,
+                  cardPadding: distribution.cardPadding,
+                  icon: Icons.medication_rounded,
+                  iconColor: AppColors.primary,
+                  iconBgColor: AppColors.primary.withValues(alpha: 0.1),
+                  value: '12',
+                  label: 'Medicines',
+                  sublabel: 'In Stock',
+                  onTap: onMedicinesTap,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _GlanceCard(
-                config: config,
-                icon: Icons.warning_amber_rounded,
-                iconColor: AppColors.danger,
-                iconBgColor: AppColors.danger.withValues(alpha: 0.1),
-                value: '2',
-                label: 'Low Stock',
-                sublabel: 'Need Refill',
-                valueColor: AppColors.danger,
-                onTap: onLowStockTap,
+              const SizedBox(width: 8),
+              Expanded(
+                child: _GlanceCard(
+                  minHeight: distribution.glanceMinHeight,
+                  cardPadding: distribution.cardPadding,
+                  icon: Icons.warning_amber_rounded,
+                  iconColor: AppColors.danger,
+                  iconBgColor: AppColors.danger.withValues(alpha: 0.1),
+                  value: '2',
+                  label: 'Low Stock',
+                  sublabel: 'Need Refill',
+                  valueColor: AppColors.danger,
+                  onTap: onLowStockTap,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _GlanceCard(
-                config: config,
-                icon: Icons.calendar_month_rounded,
-                iconColor: const Color(0xFF0D9EF5),
-                iconBgColor: const Color(0xFF0D9EF5).withValues(alpha: 0.1),
-                value: '1',
-                label: 'Upcoming',
-                sublabel: 'Appointment',
-                onTap: onUpcomingTap,
+              const SizedBox(width: 8),
+              Expanded(
+                child: _GlanceCard(
+                  minHeight: distribution.glanceMinHeight,
+                  cardPadding: distribution.cardPadding,
+                  icon: Icons.calendar_month_rounded,
+                  iconColor: const Color(0xFF0D9EF5),
+                  iconBgColor: const Color(0xFF0D9EF5).withValues(alpha: 0.1),
+                  value: '1',
+                  label: 'Upcoming',
+                  sublabel: 'Appointment',
+                  onTap: onUpcomingTap,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -939,7 +1004,8 @@ class _AtAGlanceSection extends StatelessWidget {
 
 class _GlanceCard extends StatelessWidget {
   const _GlanceCard({
-    required this.config,
+    required this.minHeight,
+    required this.cardPadding,
     required this.icon,
     required this.iconColor,
     required this.iconBgColor,
@@ -950,7 +1016,8 @@ class _GlanceCard extends StatelessWidget {
     this.valueColor,
   });
 
-  final _LayoutConfig config;
+  final double minHeight;
+  final double cardPadding;
   final IconData icon;
   final Color iconColor;
   final Color iconBgColor;
@@ -962,11 +1029,16 @@ class _GlanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = Responsive.isCompactWidth(context);
+    final valueFontSize = isCompact ? 22.0 : 26.0;
+    final labelFontSize = isCompact ? 11.0 : 12.0;
+    final sublabelFontSize = isCompact ? 9.5 : 10.0;
+
     return TappableScale(
       onTap: onTap,
       child: Container(
-        height: config.glanceCardHeight,
-        padding: EdgeInsets.all(config.glancePadding),
+        constraints: BoxConstraints(minHeight: minHeight),
+        padding: EdgeInsets.all(cardPadding),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
@@ -984,11 +1056,12 @@ class _GlanceCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             // Icon
             Container(
-              width: config.glanceIconSize,
-              height: config.glanceIconSize,
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
                 color: iconBgColor,
                 shape: BoxShape.circle,
@@ -996,75 +1069,57 @@ class _GlanceCard extends StatelessWidget {
               child: Icon(
                 icon,
                 color: iconColor,
-                size: config.glanceIconSize * 0.55,
+                size: 16,
               ),
             ),
-
-            const Spacer(),
+            const SizedBox(height: 8),
 
             // Information group
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 12 / 2 / 1
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    value,
-                    style: TextStyle(
-                      color: valueColor ?? AppColors.textPrimary,
-                      fontSize: config.glanceValueSize,
-                      fontWeight: FontWeight.w800,
-                      fontFamily: AppFonts.inter,
-                      height: 0.95,
-                      letterSpacing: -0.7,
-                    ),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: valueColor ?? AppColors.textPrimary,
+                    fontSize: valueFontSize,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: AppFonts.inter,
+                    height: 1.0,
+                    letterSpacing: -0.5,
                   ),
                 ),
-
                 const SizedBox(height: 3),
-
-                // Medicines / Low Stock / Upcoming
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: config.glanceLabelSize,
-                      fontWeight: FontWeight.w700,
-                      fontFamily: AppFonts.inter,
-                      height: 1.0,
-                      letterSpacing: -0.1,
-                    ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: labelFontSize,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: AppFonts.inter,
+                    height: 1.1,
                   ),
                 ),
-
                 const SizedBox(height: 2),
-
-                // In Stock / Need Refill / Appointment
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    sublabel,
-                    style: TextStyle(
-                      color: AppColors.textSecondary.withValues(alpha: 0.78),
-                      fontSize: config.glanceSublabelSize,
-                      fontWeight: FontWeight.w400,
-                      fontFamily: AppFonts.inter,
-                      height: 1.0,
-                    ),
+                Text(
+                  sublabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textSecondary.withValues(alpha: 0.8),
+                    fontSize: sublabelFontSize,
+                    fontWeight: FontWeight.w400,
+                    fontFamily: AppFonts.inter,
+                    height: 1.1,
                   ),
                 ),
               ],
             ),
-
-            // Keeps bottom text above the rounded-corner zone
-            const SizedBox(height: 7),
           ],
         ),
       ),
@@ -1073,88 +1128,84 @@ class _GlanceCard extends StatelessWidget {
 }
 
 class _HealthTipCard extends StatelessWidget {
-  const _HealthTipCard({required this.config});
+  const _HealthTipCard({required this.distribution});
 
-  final _LayoutConfig config;
+  final VerticalDistribution distribution;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: config.healthTipHeight,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFEF9EB),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: AppColors.warning.withValues(alpha: 0.22),
-            width: 1.2,
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(minHeight: distribution.healthTipMinHeight),
+      padding: EdgeInsets.symmetric(
+        horizontal: distribution.cardPadding + 2,
+        vertical: distribution.cardPadding,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF9EB),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: AppColors.warning.withValues(alpha: 0.22),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.025),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.025),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // SHARK DOC Mascot
+          SizedBox(
+            width: 72,
+            height: 72,
+            child: Image.asset(
+              'assets/images/mascot/shark_doc_tip.png',
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
             ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // SHARK DOC
-            SizedBox(
-              width: 78,
-              height: double.infinity,
-              child: Transform.scale(
-                scale: 1.12,
-                alignment: Alignment.center,
-                child: Image.asset(
-                  'assets/images/mascot/shark_doc_tip.png',
-                  fit: BoxFit.contain,
-                  alignment: Alignment.center,
+          ),
+          const SizedBox(width: 12),
+
+          // TIP CONTENT
+          const Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Health Tip',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: AppFonts.inter,
+                    height: 1.1,
+                  ),
                 ),
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            // TIP CONTENT
-            const Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Health Tip',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      fontFamily: AppFonts.inter,
-                      height: 1.1,
-                    ),
+                SizedBox(height: 4),
+                Text(
+                  'Drink a glass of water with your morning '
+                  'medicines to stay hydrated.',
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: AppFonts.inter,
+                    height: 1.3,
                   ),
-                  SizedBox(height: 3),
-                  Text(
-                    'Drink a glass of water with your morning '
-                    'medicines to stay hydrated.',
-                    maxLines: 2,
-                    overflow: TextOverflow.visible,
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      fontFamily: AppFonts.inter,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1175,7 +1226,7 @@ class _CareDoseBottomNav extends StatelessWidget {
     final navHeight = 64.0 + bottomInset;
 
     return SizedBox(
-      height: navHeight + 18,
+      height: navHeight + 16,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.bottomCenter,
@@ -1225,7 +1276,7 @@ class _CareDoseBottomNav extends StatelessWidget {
                       onPressed: () => onTabSelected(1),
                     ),
                   ),
-                  const SizedBox(width: 68),
+                  const SizedBox(width: 58),
                   Expanded(
                     child: _NavIconButton(
                       icon: Icons.history_rounded,
@@ -1334,8 +1385,8 @@ class _PrimaryNavButtonState extends State<_PrimaryNavButton> {
     return TappableScale(
       onTap: widget.onPressed,
       child: Container(
-        width: 60,
-        height: 60,
+        width: 58,
+        height: 58,
         decoration: BoxDecoration(
           color: const Color(0xFF212121),
           shape: BoxShape.circle,
@@ -1360,7 +1411,7 @@ class _PrimaryNavButtonState extends State<_PrimaryNavButton> {
         child: Icon(
           Icons.add_rounded,
           color: widget.isSelected ? AppColors.warning : Colors.white,
-          size: 34,
+          size: 32,
         ),
       ),
     );

@@ -63,7 +63,6 @@ GEMINI.md
 /*.webp
 
 # Font source/archive files kept in project root
-/Inter font/
 /Inter.zip
 
 # VS Code local workspace configuration
@@ -73,3 +72,6 @@ GEMINI.md
 .gemini/
 .claude/
 .codex/
+
+.agents/
+tree.txt

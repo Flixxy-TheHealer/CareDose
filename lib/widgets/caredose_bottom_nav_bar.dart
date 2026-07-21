@@ -43,9 +43,12 @@ class CareDoseBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final horizontalMargin = screenWidth < 350 ? 12.0 : 20.0;
+
     return SafeArea(
       top: false,
-      minimum: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      minimum: EdgeInsets.fromLTRB(horizontalMargin, 0, horizontalMargin, 12),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.card.withValues(alpha: 0.98),
@@ -60,7 +63,7 @@ class CareDoseBottomNavBar extends StatelessWidget {
           ],
         ),
         child: SizedBox(
-          height: 82,
+          height: 76,
           child: Row(
             children: List.generate(_items.length, (index) {
               final item = _items[index];
@@ -126,16 +129,16 @@ class _NavIconButtonState extends State<_NavIconButton> {
             curve: Curves.easeOut,
             child: Container(
               color: Colors.transparent, // Expand tap area
-              height: 64,
+              height: 60,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
                     widget.isSelected ? widget.item.activeIcon : widget.item.icon,
                     color: iconColor,
-                    size: 28,
+                    size: 26,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   _SelectionDot(isVisible: widget.isSelected),
                 ],
               ),
@@ -184,8 +187,8 @@ class _PrimaryNavButtonState extends State<_PrimaryNavButton> {
               duration: const Duration(milliseconds: 80),
               curve: Curves.easeOut,
               child: Container(
-                width: 62,
-                height: 62,
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
                   color: AppColors.textPrimary, // Dominant circular black button
                   shape: BoxShape.circle,
@@ -212,7 +215,7 @@ class _PrimaryNavButtonState extends State<_PrimaryNavButton> {
                 child: Icon(
                   Icons.add_rounded,
                   color: widget.isSelected ? AppColors.warning : AppColors.card,
-                  size: 36,
+                  size: 32,
                 ),
               ),
             ),
@@ -232,8 +235,8 @@ class _SelectionDot extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
-      width: isVisible ? 6 : 0,
-      height: isVisible ? 6 : 0,
+      width: isVisible ? 5 : 0,
+      height: isVisible ? 5 : 0,
       decoration: const BoxDecoration(
         color: AppColors.primary, // Matches primary green theme
         shape: BoxShape.circle,
