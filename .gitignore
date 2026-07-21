@@ -43,3 +43,33 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ============================================================
+# PRIVATE / DEVELOPMENT-ONLY FILES
+# ============================================================
+
+# AI/context/instruction files
+CAREDOSE_CONTEXT.md
+*_CONTEXT.md
+*CONTEXT*.md
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+
+# Reference / concept images in project root only
+/*.jpeg
+/*.jpg
+/*.png
+/*.webp
+
+# Font source/archive files kept in project root
+/Inter font/
+/Inter.zip
+
+# VS Code local workspace configuration
+.vscode/
+
+# Misc AI/tool metadata
+.gemini/
+.claude/
+.codex/
